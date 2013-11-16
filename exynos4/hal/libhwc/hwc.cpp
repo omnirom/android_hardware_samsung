@@ -60,7 +60,7 @@
 
 const size_t NUM_HW_WINDOWS = 5;
 const size_t NO_FB_NEEDED = NUM_HW_WINDOWS + 1;
-const size_t MAX_PIXELS = 480 * 800 * 2;
+const size_t MAX_PIXELS = 800 * 1280 * 2;
 const size_t FIMC_W_ALIGNMENT = 16;
 const size_t FIMC_H_ALIGNMENT = 16;
 const size_t FIMC_DST_CROP_W_ALIGNMENT_RGB888 = 32;
@@ -523,9 +523,7 @@ static enum s3c_fb_blending exynos4_blending_to_s3c_blending(int32_t blending)
 
 static bool exynos4_blending_is_supported(int32_t blending)
 {
-    /* We currently do not support blending */
-    //return exynos4_blending_to_s3c_blending(blending) < S3C_FB_BLENDING_MAX;
-    return false;
+    return exynos4_blending_to_s3c_blending(blending) < S3C_FB_BLENDING_MAX;
 }
 
 
@@ -1677,7 +1675,6 @@ static int exynos4_set_fimd(exynos4_hwc_composer_device_1_t *pdev,
         }
     }
 
-/*
     int fence;
     if (!err) {
         fence = exynos4_post_fimd(pdev, contents);
@@ -1706,7 +1703,7 @@ static int exynos4_set_fimd(exynos4_hwc_composer_device_1_t *pdev,
         }
     }
     close(fence);
-*/
+
     return err;
 }
 
@@ -2253,7 +2250,6 @@ static int exynos4_open(const struct hw_module_t *module, const char *name,
         for (size_t j = 0; j < NUM_FIMC_DST_BUFS; j++)
             dev->fimc[i].dst_buf_fence[j] = -1;
 
-    //dev->vsync_fd = open("/sys/devices/platform/exynos4-fb.0/vsync", O_RDONLY);
     dev->vsync_fd = open("/sys/devices/platform/samsung-pd.2/s3cfb.0/vsync_time", O_RDONLY);
     if (dev->vsync_fd < 0) {
         ALOGE("failed to open vsync attribute");
