@@ -253,6 +253,28 @@ namespace android {
 #define CAPTURE_MODE 2
 #define RECORD_MODE 3
 
+/* We use this struct as the v4l2_streamparm raw_data for
+ * VIDIOC_G_PARM and VIDIOC_S_PARM
+ */
+struct sec_cam_parm {
+    struct v4l2_captureparm capture;
+    int contrast;
+    int effects;
+    int brightness;
+    int exposure;
+    int flash_mode;
+    int focus_mode;
+    int aeawb_mode;
+    int iso;
+    int metering;
+    int saturation;
+    int scene_mode;
+    int sharpness;
+    int hue;
+    int white_balance;
+    int anti_banding;
+};
+
 struct yuv_fmt_list {
     const char  *name;
     const char  *desc;
