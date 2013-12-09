@@ -54,16 +54,25 @@
 /* numbers of buffers for page flipping */
 #define NUM_BUFFERS 2
 
+static int swapInterval = 1;
+
 enum {
     PAGE_FLIP = 0x00000001,
 };
 
 static int fb_set_swap_interval(struct framebuffer_device_t* dev, int interval)
 {
-    if (interval < dev->minSwapInterval || interval > dev->maxSwapInterval)
-        return -EINVAL;
+    if (interval < dev->minSwapInterval)
+    {
+        interval = dev->minSwapInterval;
+    }
+    else if (interval > dev->maxSwapInterval)
+    {
+        interval = dev->maxSwapInterval;
+    }
 
-    /* Currently not implemented */
+    swapInterval = interval;
+
     return 0;
 }
 
@@ -98,7 +107,7 @@ static int fb_post(struct framebuffer_device_t* dev, buffer_handle_t buffer)
             return 0;
         }
 
-        if (m->enableVSync) {
+        if (m->enableVSync || swapInterval == 1) {
             /* enable VSYNC */
             interrupt = 1;
             if (ioctl(m->framebuffer->fd, S3CFB_SET_VSYNC_INT, &interrupt) < 0) {
@@ -467,7 +476,7 @@ int framebuffer_device_open(hw_module_t const* module, const char* name, hw_devi
     const_cast<float&>(dev->xdpi) = m->xdpi;
     const_cast<float&>(dev->ydpi) = m->ydpi;
     const_cast<float&>(dev->fps) = m->fps;
-    const_cast<int&>(dev->minSwapInterval) = 1;
+    const_cast<int&>(dev->minSwapInterval) = 0;
     const_cast<int&>(dev->maxSwapInterval) = 1;
     *device = &dev->common;
     status = 0;
