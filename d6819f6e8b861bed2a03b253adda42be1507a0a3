@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6b8b61a3_ae255506",
+        "filename": "exynos4/hal/libgralloc_ump/framebuffer_device.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 57,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2013-12-17T10:43:00Z",
+      "side": 1,
+      "message": "Why is max interval 1? Where did it came from?",
+      "revId": "d6819f6e8b861bed2a03b253adda42be1507a0a3",
+      "serverId": "56841c99-7c94-43d4-bf0b-cb4707e66d55",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "6b8b61a3_ce22a1fc",
+        "filename": "exynos4/hal/libgralloc_ump/framebuffer_device.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 110,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2013-12-17T10:43:00Z",
+      "side": 1,
+      "message": "What if the swapInterval requested is slower than VSync? What if it\u0027s faster than vsync?",
+      "revId": "d6819f6e8b861bed2a03b253adda42be1507a0a3",
+      "serverId": "56841c99-7c94-43d4-bf0b-cb4707e66d55",
+      "unresolved": false
+    }
+  ]
+}
