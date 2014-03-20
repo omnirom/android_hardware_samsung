@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8b77b57d_f969dd1d",
+        "filename": "macloader/macloader.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2014-03-20T23:28:14Z",
+      "side": 0,
+      "message": "It appears you\u0027re removing a semcosh MAC here, why?",
+      "revId": "a28fa8e0a8d64c960f2157e779de0e3d13d2174b",
+      "serverId": "56841c99-7c94-43d4-bf0b-cb4707e66d55",
+      "unresolved": false
+    }
+  ]
+}
