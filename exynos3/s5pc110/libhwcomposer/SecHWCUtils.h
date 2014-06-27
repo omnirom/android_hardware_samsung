@@ -50,7 +50,11 @@
 #define GRALLOC_USAGE_PHYS_CONTIG GRALLOC_USAGE_PRIVATE_1
 
 #define NUM_OF_WIN          (1)
+#ifdef TARGET_DISABLE_TRIPLE_BUFFERING
+#define NUM_OF_WIN_BUF      (2)
+#else
 #define NUM_OF_WIN_BUF      (3)
+#endif
 #define NUM_OF_MEM_OBJ      (1)
 #define MAX_NUM_PLANES      (3)
 
