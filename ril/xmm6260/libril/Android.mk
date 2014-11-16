@@ -21,7 +21,7 @@ LOCAL_CFLAGS :=
 
 LOCAL_MODULE:= libril
 
-LOCAL_LDLIBS += -lpthread
+LOCAL_LDLIBS +=
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -43,7 +43,7 @@ LOCAL_CFLAGS :=
 
 LOCAL_MODULE:= libril_static
 
-LOCAL_LDLIBS += -lpthread
+LOCAL_LDLIBS +=
 
 include $(BUILD_STATIC_LIBRARY)
 endif # ANDROID_BIONIC_TRANSITION
