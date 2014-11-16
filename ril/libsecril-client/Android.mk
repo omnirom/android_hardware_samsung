@@ -13,10 +13,10 @@ LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libhardware_legacy
 
-LOCAL_CFLAGS := 
+LOCAL_CFLAGS += -DHAVE_PTHREADS
 
 LOCAL_MODULE:= libsecril-client
 LOCAL_PRELINK_MODULE := false
-LOCAL_LDLIBS += -lpthread
+LOCAL_LDLIBS +=
 
 include $(BUILD_SHARED_LIBRARY)
