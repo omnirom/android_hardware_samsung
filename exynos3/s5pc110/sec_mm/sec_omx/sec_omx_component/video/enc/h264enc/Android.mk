@@ -18,7 +18,7 @@ LOCAL_STATIC_LIBRARIES := libSEC_OMX_Venc libsecosal libsecbasecomponent \
 						libsecmfcencapi libseccsc
 LOCAL_SHARED_LIBRARIES := libc libdl libcutils libutils libui libhardware
 
-LOCAL_C_INCLUDES := $(SEC_OMX_INC)/khronos \
+LOCAL_C_INCLUDES := $(OMX_INC) \
 	$(SEC_OMX_INC)/sec \
 	$(SEC_OMX_TOP)/sec_osal \
 	$(SEC_OMX_TOP)/sec_omx_core \
