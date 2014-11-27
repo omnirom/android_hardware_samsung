@@ -32,7 +32,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include "linux/fb.h"
-#include <linux/videodev.h>
+#include "videodev.h"
 
 #include <hardware/gralloc.h>
 #include <hardware/hardware.h>
