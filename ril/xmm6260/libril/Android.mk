@@ -17,7 +17,7 @@ LOCAL_SHARED_LIBRARIES := \
     libhardware_legacy \
     librilutils
 
-LOCAL_CFLAGS :=
+LOCAL_CFLAGS := -DHAVE_PTHREADS
 
 LOCAL_MODULE:= libril
 
@@ -39,7 +39,7 @@ LOCAL_STATIC_LIBRARIES := \
     libcutils \
     librilutils_static
 
-LOCAL_CFLAGS :=
+LOCAL_CFLAGS := -DHAVE_PTHREADS
 
 LOCAL_MODULE:= libril_static
 
