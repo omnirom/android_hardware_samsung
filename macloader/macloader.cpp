@@ -33,7 +33,9 @@ enum Type {
     NONE,
     MURATA,
     SEMCOSH,
-    SEMCOVE
+    SEMCOVE,
+    SEMCO3RD,
+    WISOL
 };
 
 int main() {
@@ -71,7 +73,7 @@ int main() {
         strncasecmp(mac_addr_half, "00:60:57", 9) == 0 ||
         strncasecmp(mac_addr_half, "04:46:65", 9) == 0 ||
         strncasecmp(mac_addr_half, "10:5f:06", 9) == 0 ||
-        strncasecmp(mac_addr_half, "10:a5:D0", 9) == 0 ||
+        strncasecmp(mac_addr_half, "10:a5:d0", 9) == 0 ||
         strncasecmp(mac_addr_half, "1c:99:4c", 9) == 0 ||
         strncasecmp(mac_addr_half, "14:7d:c5", 9) == 0 ||
         strncasecmp(mac_addr_half, "20:02:af", 9) == 0 ||
@@ -79,18 +81,32 @@ int main() {
         strncasecmp(mac_addr_half, "44:a7:cf", 9) == 0 ||
         strncasecmp(mac_addr_half, "5c:da:d4", 9) == 0 ||
         strncasecmp(mac_addr_half, "5c:f8:a1", 9) == 0 ||
-        strncasecmp(mac_addr_half, "78:4B:87", 9) == 0 ||
+        strncasecmp(mac_addr_half, "78:4b:87", 9) == 0 ||
         strncasecmp(mac_addr_half, "60:21:c0", 9) == 0 ||
         strncasecmp(mac_addr_half, "88:30:8a", 9) == 0 ||
-        strncasecmp(mac_addr_half, "f0:27:65", 9) == 0) {
+        strncasecmp(mac_addr_half, "f0:27:65", 9) == 0 ||
+        strncasecmp(mac_addr_half, "fc:c2:de", 9) == 0) {
         type = MURATA;
     }
 
     /* semcosh */
-    if (strncasecmp(mac_addr_half, "38:aa:3c", 9) == 0 ||
+    if (strncasecmp(mac_addr_half, "34:23:ba", 9) == 0 ||
+        strncasecmp(mac_addr_half, "38:aa:3c", 9) == 0 ||
         strncasecmp(mac_addr_half, "5c:0a:5b", 9) == 0 ||
+        strncasecmp(mac_addr_half, "88:32:9b", 9) == 0 ||
+        strncasecmp(mac_addr_half, "90:18:7c", 9) == 0 ||
         strncasecmp(mac_addr_half, "cc:3a:61", 9) == 0) {
         type = SEMCOSH;
+    }
+
+    /* semco3rd */
+    if (strncasecmp(mac_addr_half, "f4:09:d8", 9) == 0) {
+        type = SEMCO3RD;
+    }
+
+    /* wisol */
+    if (strncasecmp(mac_addr_half, "48:5A:3F", 9) == 0) {
+        type = WISOL;
     }
 
     if (type != NONE) {
@@ -120,6 +136,14 @@ int main() {
                 /* write semcove to cid file */
                 ALOGI("Writing semcove to %s\n", CID_PATH);
                 ret = fputs("semcove", cidfile);
+            break;
+            case SEMCO3RD:
+                ALOGI("Writing semco3rd to %s\n", CID_PATH);
+                ret = fputs("semco3rd", cidfile);
+            break;
+            case WISOL:
+                ALOGI("Writing wisol to %s\n", CID_PATH);
+                ret = fputs("wisol", cidfile);
             break;
          }
 
