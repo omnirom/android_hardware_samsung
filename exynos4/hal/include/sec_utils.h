@@ -28,6 +28,8 @@
 extern "C" {
 #endif
 
+#include <linux/videodev2.h>
+
 #ifdef __cplusplus
 }
 #endif

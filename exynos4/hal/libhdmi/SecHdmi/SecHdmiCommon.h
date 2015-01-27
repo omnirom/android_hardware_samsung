@@ -22,7 +22,7 @@
 //#define LOG_TAG "libhdmi"
 #include <cutils/log.h>
 
-#include "videodev2.h"
+#include <linux/videodev2.h>
 #if defined(BOARD_USE_V4L2)
 #include "s5p_tvout_v4l2.h"
 #else
@@ -135,4 +135,10 @@ enum hdmi_layer {
     HDMI_LAYER_GRAPHIC_0,
     HDMI_LAYER_GRAPHIC_1,
     HDMI_LAYER_MAX,
+};
+
+enum hdmi_s3d_mode {
+    HDMI_2D = 0,
+    HDMI_S3D_TB,
+    HDMI_S3D_SBS,
 };

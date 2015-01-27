@@ -19,7 +19,7 @@
 
 #include <linux/fb.h>
 
-#include "videodev2.h"
+#include <linux/videodev2.h>
 
 #ifdef __cplusplus
 extern "C" {
