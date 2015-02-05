@@ -694,6 +694,57 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
         return response;
     }
 
+
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    public void sendSMSExpectMore(String smscPDU, String pdu, Message result) {
+        sendSMS(smscPDU, pdu, result);
+    }
+
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    public void getCellInfoList(Message result) {
+        riljLog("getCellInfoList: not supported");
+        if (result != null) {
+            CommandException ex = new CommandException(
+            CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(result, null, ex);
+            result.sendToTarget();
+        }
+    }
+
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    public void setCellInfoListRate(int rateInMillis, Message response) {
+        riljLog("setCellInfoListRate: not supported");
+        if (response != null) {
+            CommandException ex = new CommandException(
+            CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(response, null, ex);
+            response.sendToTarget();
+        }
+    }
+
+    /**
+    * {@inheritDoc}
+    */
+    @Override
+    public void getHardwareConfig(Message result) {
+        riljLog("Ignoring call to 'getHardwareConfig'");
+        if (result != null) {
+            CommandException ex = new CommandException(
+            CommandException.Error.REQUEST_NOT_SUPPORTED);
+            AsyncResult.forMessage(result, null, ex);
+            result.sendToTarget();
+        }
+    }
+
     @Override
     protected Object
     responseSignalStrength(Parcel p) {
