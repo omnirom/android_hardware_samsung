@@ -6,8 +6,7 @@ include $(CLEAR_VARS)
 SEC_OMX_TOP := $(LOCAL_PATH)
 SEC_CODECS := $(SEC_OMX_TOP)/sec_codecs/
 
-OMX_INC := $(TOP)/frameworks/native/include/media/openmax
-SEC_OMX_INC := $(SEC_OMX_TOP)/sec_omx_include
+SEC_OMX_INC := $(SEC_OMX_TOP)/sec_omx_include/
 SEC_OMX_COMPONENT := $(SEC_OMX_TOP)/sec_omx_component
 
 include $(SEC_OMX_TOP)/sec_osal/Android.mk

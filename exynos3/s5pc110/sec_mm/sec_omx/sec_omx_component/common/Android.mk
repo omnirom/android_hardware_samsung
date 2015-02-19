@@ -16,7 +16,7 @@ LOCAL_CFLAGS :=
 LOCAL_STATIC_LIBRARIES := libsecosal
 LOCAL_SHARED_LIBRARIES := libcutils libutils
 
-LOCAL_C_INCLUDES := $(OMX_INC) \
+LOCAL_C_INCLUDES := $(SEC_OMX_INC)/khronos \
 	$(SEC_OMX_INC)/sec \
 	$(SEC_OMX_TOP)/sec_osal
 
