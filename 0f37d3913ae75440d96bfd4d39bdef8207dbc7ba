@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6b22818b_e2a83f8b",
+        "filename": "ril/xmm6262/libril/ril.cpp",
+        "patchSetId": 4
+      },
+      "lineNbr": 1514,
+      "author": {
+        "id": 1000032
+      },
+      "writtenOn": "2015-03-01T19:40:19Z",
+      "side": 1,
+      "message": "Bad merge.",
+      "revId": "0f37d3913ae75440d96bfd4d39bdef8207dbc7ba",
+      "serverId": "56841c99-7c94-43d4-bf0b-cb4707e66d55",
+      "unresolved": false
+    }
+  ]
+}
