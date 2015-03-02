@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6b22818b_bdf90a1a",
+        "filename": "exynos4/hal/libhdmi/libhdmiservice/SecHdmiClient.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 70,
+      "author": {
+        "id": 1000280
+      },
+      "writtenOn": "2015-03-02T22:58:04Z",
+      "side": 1,
+      "message": "Authorship.",
+      "revId": "9bddd7c3909cd490389053dd763e9b726059eccd",
+      "serverId": "56841c99-7c94-43d4-bf0b-cb4707e66d55",
+      "unresolved": false
+    }
+  ]
+}
