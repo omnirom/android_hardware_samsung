@@ -58,6 +58,8 @@ import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaSignalInfo
 import com.android.internal.telephony.cdma.SignalToneUtil;
 import com.android.internal.telephony.dataconnection.DataCallResponse;
 import com.android.internal.telephony.dataconnection.DcFailCause;
+import com.android.internal.telephony.HardwareConfig;
+import com.android.internal.telephony.RadioCapability;
 
 import android.telephony.Rlog;
 
@@ -86,6 +88,13 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
     requestToString(int request) {
         switch (request) {
             case RIL_REQUEST_DIAL_EMERGENCY: return "DIAL_EMERGENCY";
+            case RIL_REQUEST_SIM_AUTHENTICATION:
+                    return "RIL_REQUEST_SIM_AUTHENTICATION";
+            case RIL_REQUEST_GET_HARDWARE_CONFIG: return "GET_HARDWARE_CONFIG";
+            case RIL_REQUEST_SET_RADIO_CAPABILITY:
+                    return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+            case RIL_REQUEST_GET_RADIO_CAPABILITY:
+                    return "RIL_REQUEST_GET_RADIO_CAPABILITY";
             default: return RIL.requestToString(request);
         }
     }
@@ -277,7 +286,11 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_NV_RESET_CONFIG: ret = responseVoid(p); break;
             case RIL_REQUEST_SET_UICC_SUBSCRIPTION: ret = responseVoid(p); break;
             case RIL_REQUEST_ALLOW_DATA: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_HARDWARE_CONFIG: ret = responseHardwareConfig(p); break;
+            case RIL_REQUEST_SIM_AUTHENTICATION: ret =  responseICC_IOBase64(p); break;
             case RIL_REQUEST_SHUTDOWN: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: ret =  responseRadioCapability(p); break;
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: ret =  responseRadioCapability(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
                 //break;
@@ -443,6 +456,9 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
         case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2: ret = responseVoid(p); break;
         case RIL_UNSOL_AM: ret = responseString(p); break;
         case RIL_UNSOL_STK_SEND_SMS_RESULT: ret = responseInts(p); break; // Samsung STK
+        case RIL_UNSOL_HARDWARE_CONFIG_CHANGED: ret = responseHardwareConfig(p); break;
+        case RIL_UNSOL_RADIO_CAPABILITY:
+                ret = responseRadioCapability(p); break;
 
         default:
             // Rewind the Parcel
@@ -559,6 +575,14 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
                 Rlog.e(RILJ_LOG_TAG, "am " + amString + " could not be executed.");
             }
             break;
+        case RIL_UNSOL_HARDWARE_CONFIG_CHANGED:
+            if (RILJ_LOGD) unsljLogRet(response, ret);
+
+            if (mHardwareConfigChangeRegistrants != null) {
+                mHardwareConfigChangeRegistrants.notifyRegistrants(
+                                         new AsyncResult (null, ret, null));
+            }
+            break;
         // Samsung STK
         case RIL_UNSOL_STK_SEND_SMS_RESULT:
             if (Resources.getSystem().
@@ -571,6 +595,14 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
                 }
             }
             break;
+        case RIL_UNSOL_RADIO_CAPABILITY:
+            if (RILJ_LOGD) unsljLogRet(response, ret);
+
+            if (mPhoneRadioCapabilityChangedRegistrants != null) {
+                mPhoneRadioCapabilityChangedRegistrants.notifyRegistrants(
+                        new AsyncResult(null, ret, null));
+             }
+             break;
         }
     }
 
@@ -1115,28 +1147,26 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
         }
     }
 
-    // Hack for Lollipop
-    // The system now queries for SIM status before radio on, resulting
-    // in getting an APPSTATE_DETECTED state. The RIL does not send an
-    // RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED message after the SIM is
-    // initialized, so delay the message until the radio is on.
-    @Override
-    public void
-    getIccCardStatus(Message result) {
-        if (mState != RadioState.RADIO_ON) {
-            mPendingGetSimStatus = result;
-        } else {
-            super.getIccCardStatus(result);
-        }
+    private void
+    constructGsmSendSmsRilRequest (RILRequest rr, String smscPDU, String pdu) {
+        rr.mParcel.writeInt(2);
+        rr.mParcel.writeString(smscPDU);
+        rr.mParcel.writeString(pdu);
     }
 
+    /**
+    * The RIL can't handle the RIL_REQUEST_SEND_SMS_EXPECT_MORE
+    * request properly, so we use RIL_REQUEST_SEND_SMS instead.
+    */
     @Override
-    protected void switchToRadioState(RadioState newState) {
-        super.switchToRadioState(newState);
+    public void
+    sendSMSExpectMore (String smscPDU, String pdu, Message result) {
+        RILRequest rr
+                = RILRequest.obtain(RIL_REQUEST_SEND_SMS, result);
+        constructGsmSendSmsRilRequest(rr, smscPDU, pdu);
 
-        if (newState == RadioState.RADIO_ON && mPendingGetSimStatus != null) {
-            super.getIccCardStatus(mPendingGetSimStatus);
-            mPendingGetSimStatus = null;
-        }
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
     }
 }
