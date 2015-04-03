@@ -58,6 +58,7 @@ import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaSignalInfo
 import com.android.internal.telephony.cdma.SignalToneUtil;
 import com.android.internal.telephony.dataconnection.DataCallResponse;
 import com.android.internal.telephony.dataconnection.DcFailCause;
+import com.android.internal.telephony.RadioCapability;
 
 import android.telephony.Rlog;
 
@@ -86,6 +87,10 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
     requestToString(int request) {
         switch (request) {
             case RIL_REQUEST_DIAL_EMERGENCY: return "DIAL_EMERGENCY";
+            case RIL_REQUEST_SET_RADIO_CAPABILITY:
+                    return "RIL_REQUEST_SET_RADIO_CAPABILITY";
+            case RIL_REQUEST_GET_RADIO_CAPABILITY:
+                    return "RIL_REQUEST_GET_RADIO_CAPABILITY";
             default: return RIL.requestToString(request);
         }
     }
@@ -111,6 +116,27 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
 
         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
         send(rr);
+    }
+
+    @Override
+    protected Object
+    responseRadioCapability(Parcel p) {
+        int version = p.readInt();
+        int session = p.readInt();
+        int phase = p.readInt();
+        int rat = p.readInt();
+        String logicModemUuid = p.readString();
+        int status = p.readInt();
+
+        riljLog("responseRadioCapability: version= " + version +
+                ", session=" + session +
+                ", phase=" + phase +
+                ", rat=" + rat +
+                ", logicModemUuid=" + logicModemUuid +
+                ", status=" + status);
+        RadioCapability rc = new RadioCapability(
+                mInstanceId.intValue(), session, phase, rat, logicModemUuid, status);
+        return rc;
     }
 
     @Override
@@ -278,6 +304,8 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
             case RIL_REQUEST_SET_UICC_SUBSCRIPTION: ret = responseVoid(p); break;
             case RIL_REQUEST_ALLOW_DATA: ret = responseVoid(p); break;
             case RIL_REQUEST_SHUTDOWN: ret = responseVoid(p); break;
+            case RIL_REQUEST_GET_RADIO_CAPABILITY: ret =  responseRadioCapability(p); break;
+            case RIL_REQUEST_SET_RADIO_CAPABILITY: ret =  responseRadioCapability(p); break;
             default:
                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
                 //break;
@@ -443,6 +471,8 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
         case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2: ret = responseVoid(p); break;
         case RIL_UNSOL_AM: ret = responseString(p); break;
         case RIL_UNSOL_STK_SEND_SMS_RESULT: ret = responseInts(p); break; // Samsung STK
+        case RIL_UNSOL_RADIO_CAPABILITY:
+                ret = responseRadioCapability(p); break;
 
         default:
             // Rewind the Parcel
@@ -497,13 +527,20 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
             result[0] = nitz;
             result[1] = Long.valueOf(nitzReceiveTime);
 
-            if (mNITZTimeRegistrant != null) {
+            boolean ignoreNitz = SystemProperties.getBoolean(
+                    TelephonyProperties.PROPERTY_IGNORE_NITZ, false);
 
-                mNITZTimeRegistrant
-                .notifyRegistrant(new AsyncResult (null, result, null));
+            if (ignoreNitz) {
+                if (RILJ_LOGD) riljLog("ignoring UNSOL_NITZ_TIME_RECEIVED");
             } else {
-                // in case NITZ time registrant isnt registered yet
-                mLastNITZTimeInfo = nitz;
+                if (mNITZTimeRegistrant != null) {
+
+                    mNITZTimeRegistrant
+                        .notifyRegistrant(new AsyncResult (null, result, null));
+                }
+                // in case NITZ time registrant isn't registered yet, or a new registrant
+                // registers later
+                mLastNITZTimeInfo = result;
             }
             break;
 
@@ -571,6 +608,14 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
                 }
             }
             break;
+        case RIL_UNSOL_RADIO_CAPABILITY:
+            if (RILJ_LOGD) unsljLogRet(response, ret);
+
+            if (mPhoneRadioCapabilityChangedRegistrants != null) {
+                mPhoneRadioCapabilityChangedRegistrants.notifyRegistrants(
+                        new AsyncResult(null, ret, null));
+             }
+             break;
         }
     }
 
@@ -1113,6 +1158,36 @@ public class SamsungExynos3RIL extends RIL implements CommandsInterface {
                 }
             }
         }
+    }
+
+    @Override
+    public void setRadioCapability(RadioCapability rc, Message response) {
+        RILRequest rr = RILRequest.obtain(
+                RIL_REQUEST_SET_RADIO_CAPABILITY, response);
+
+        rr.mParcel.writeInt(rc.getVersion());
+        rr.mParcel.writeInt(rc.getSession());
+        rr.mParcel.writeInt(rc.getPhase());
+        rr.mParcel.writeInt(rc.getRadioAccessFamily());
+        rr.mParcel.writeString(rc.getLogicalModemUuid());
+        rr.mParcel.writeInt(rc.getStatus());
+
+        if (RILJ_LOGD) {
+            riljLog(rr.serialString() + "> " + requestToString(rr.mRequest)
+                    + " " + rc.toString());
+        }
+
+        send(rr);
+    }
+
+    @Override
+    public void getRadioCapability(Message response) {
+        RILRequest rr = RILRequest.obtain(
+                RIL_REQUEST_GET_RADIO_CAPABILITY, response);
+
+        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+
+        send(rr);
     }
 
     // Hack for Lollipop
