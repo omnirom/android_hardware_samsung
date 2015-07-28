@@ -114,6 +114,9 @@ namespace android {
     #define appendPrintBuf(x...)
 #endif
 
+#define MAX_RIL_SOL     RIL_REQUEST_IMS_SEND_SMS
+#define MAX_RIL_UNSOL   RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED
+
 enum WakeType {DONT_WAKE, WAKE_PARTIAL};
 
 typedef struct {
@@ -143,7 +146,6 @@ typedef struct UserCallbackInfo {
     struct UserCallbackInfo *p_next;
 } UserCallbackInfo;
 
-#define RIL_VENDOR_COMMANDS_OFFSET 10000
 
 /*******************************************************************/
 
@@ -266,15 +268,9 @@ static UserCallbackInfo * internalRequestTimedCallback
 static CommandInfo s_commands[] = {
 #include "ril_commands.h"
 };
-static CommandInfo s_commands_v[] = {
-#include "ril_commands_vendor.h"
-};
 
 static UnsolResponseInfo s_unsolResponses[] = {
 #include "ril_unsol_commands.h"
-};
-static UnsolResponseInfo s_unsolResponses_v[] = {
-#include "ril_unsol_commands_vendor.h"
 };
 
 /* For older RILs that do not support new commands RIL_REQUEST_VOICE_RADIO_TECH and
@@ -345,9 +341,11 @@ issueLocalRequest(int request, void *data, int len) {
     pRI->local = 1;
     pRI->token = 0xffffffff;        // token is not used in this context
 
-    /* Check vendor commands */
-    if (request > RIL_VENDOR_COMMANDS_OFFSET) {
-        pRI->pCI = &(s_commands_v[request - RIL_VENDOR_COMMANDS_OFFSET]);
+    /* Hack to include Samsung requests */
+    if (request > 10000) {
+        index = request - 10000 + MAX_RIL_SOL;
+        RLOGD("SAMSUNG: request=%d, index=%d", request, index);
+        pRI->pCI = &(s_commands[index]);
     } else {
         pRI->pCI = &(s_commands[request]);
     }
@@ -387,21 +385,10 @@ processCommandBuffer(void *buffer, size_t buflen) {
         return 0;
     }
 
-    CommandInfo *pCI = NULL;
-    /* Check vendor commands */
-    if (request > RIL_VENDOR_COMMANDS_OFFSET) {
-        int index = request - RIL_VENDOR_COMMANDS_OFFSET;
-        RLOGD("processCommandBuffer: samsung request=%d, index=%d",
-                request, index);
-        if (index < (int)NUM_ELEMS(s_commands_v))
-            pCI = &(s_commands_v[index]);
-    } else {
-        if (request < (int)NUM_ELEMS(s_commands))
-            pCI = &(s_commands[request]);
-    }
-
-    if (pCI == NULL)
-    {
+    /* Hack to include Samsung requests */
+    if (request < 1 || ((request > MAX_RIL_SOL) &&
+            (request < RIL_REQUEST_GET_CELL_BROADCAST_CONFIG)) ||
+            request > RIL_REQUEST_HANGUP_VT) {
         RLOGE("unsupported request code %d token %d", request, token);
         // FIXME this should perhaps return a response
         return 0;
@@ -410,7 +397,16 @@ processCommandBuffer(void *buffer, size_t buflen) {
     pRI = (RequestInfo *)calloc(1, sizeof(RequestInfo));
 
     pRI->token = token;
-    pRI->pCI = pCI;
+
+    /* Hack to include Samsung requests */
+    if (request > 10000) {
+        index = request - 10000 + MAX_RIL_SOL;
+        RLOGD("processCommandBuffer: samsung request=%d, index=%d",
+                request, index);
+        pRI->pCI = &(s_commands[index]);
+    } else {
+        pRI->pCI = &(s_commands[request]);
+    }
 
     ret = pthread_mutex_lock(&s_pendingRequestsMutex);
     assert (ret == 0);
@@ -2330,6 +2326,7 @@ static int responseRilSignalStrength(Parcel &p,
 
         /* gsmBitErrorRate */
         p.writeInt32(p_cur->GW_SignalStrength.bitErrorRate);
+
         /* cdmaDbm */
         RLOGD("cdmaDbm (raw)=%d", p_cur->CDMA_SignalStrength.dbm);
         cdmaDbm = p_cur->CDMA_SignalStrength.dbm & 0xFF;
@@ -2340,8 +2337,10 @@ static int responseRilSignalStrength(Parcel &p,
         }
         //RLOGD("cdmaDbm (corrected)=%d", cdmaDbm);
         p.writeInt32(cdmaDbm);
+
         /* cdmaEcio */
         p.writeInt32(p_cur->CDMA_SignalStrength.ecio);
+
         /* evdoDbm */
         RLOGD("evdoDbm (raw)=%d", p_cur->EVDO_SignalStrength.dbm);
         evdoDbm = p_cur->EVDO_SignalStrength.dbm & 0xFF;
@@ -3319,21 +3318,17 @@ RIL_register (const RIL_RadioFunctions *callbacks) {
     for (int i = 0; i < (int)NUM_ELEMS(s_commands); i++) {
         assert(i == s_commands[i].requestNumber);
     }
-    for (int i = 0; i < (int)NUM_ELEMS(s_commands_v); i++) {
-        assert(i + RIL_VENDOR_COMMANDS_OFFSET == s_commands[i].requestNumber);
-    }
 
     for (int i = 0; i < (int)NUM_ELEMS(s_unsolResponses); i++) {
+        /* Hack to include Samsung responses */
+        if (i > MAX_RIL_UNSOL - RIL_UNSOL_RESPONSE_BASE) {
+            assert(i + SAMSUNG_UNSOL_RESPONSE_BASE - MAX_RIL_UNSOL
+                == s_unsolResponses[i].requestNumber);
+        } else {
             assert(i + RIL_UNSOL_RESPONSE_BASE
                 == s_unsolResponses[i].requestNumber);
+        }
     }
-
-    for (int i = 0; i < (int)NUM_ELEMS(s_unsolResponses_v); i++) {
-            assert(i + RIL_UNSOL_RESPONSE_BASE + RIL_VENDOR_COMMANDS_OFFSET
-                == s_unsolResponses[i].requestNumber);
-    }
-
-
 
     // New rild impl calls RIL_startEventLoop() first
     // old standalone impl wants it here.
@@ -3635,31 +3630,28 @@ extern "C"
 void RIL_onUnsolicitedResponse(int unsolResponse, void *data,
                                 size_t datalen)
 {
+    int unsolResponseIndex;
     int ret;
     int64_t timeReceived = 0;
     bool shouldScheduleTimeout = false;
     RIL_RadioState newState;
-    UnsolResponseInfo *pRI = NULL;
 
     if (s_registerCalled == 0) {
         // Ignore RIL_onUnsolicitedResponse before RIL_register
         RLOGW("RIL_onUnsolicitedResponse called before RIL_register");
         return;
     }
-
+    
     /* Hack to include Samsung responses */
-    if (unsolResponse > RIL_VENDOR_COMMANDS_OFFSET + RIL_UNSOL_RESPONSE_BASE) {
-        int index = unsolResponse - RIL_VENDOR_COMMANDS_OFFSET - RIL_UNSOL_RESPONSE_BASE;
-        RLOGD("SAMSUNG: unsolResponse=%d, unsolResponseIndex=%d", unsolResponse, index);
-        if (index < (int)NUM_ELEMS(s_unsolResponses_v))
-            pRI = &s_unsolResponses_v[index];
+    if (unsolResponse > SAMSUNG_UNSOL_RESPONSE_BASE) {
+        unsolResponseIndex = unsolResponse - SAMSUNG_UNSOL_RESPONSE_BASE + MAX_RIL_UNSOL - RIL_UNSOL_RESPONSE_BASE;
+        RLOGD("SAMSUNG: unsolResponse=%d, unsolResponseIndex=%d", unsolResponse, unsolResponseIndex);
     } else {
-        int index = unsolResponse - RIL_UNSOL_RESPONSE_BASE;
-        if (index < (int)NUM_ELEMS(s_unsolResponses))
-            pRI = &s_unsolResponses[index];
+        unsolResponseIndex = unsolResponse - RIL_UNSOL_RESPONSE_BASE;
     }
 
-    if (pRI == NULL || pRI->responseFunction == NULL) {
+    if ((unsolResponseIndex < 0)
+        || (unsolResponseIndex >= (int32_t)NUM_ELEMS(s_unsolResponses))) {
         RLOGE("unsupported unsolicited response code %d", unsolResponse);
         return;
     }
@@ -3667,7 +3659,7 @@ void RIL_onUnsolicitedResponse(int unsolResponse, void *data,
     // Grab a wake lock if needed for this reponse,
     // as we exit we'll either release it immediately
     // or set a timer to release it later.
-    switch (pRI->wakeType) {
+    switch (s_unsolResponses[unsolResponseIndex].wakeType) {
         case WAKE_PARTIAL:
             grabPartialWakeLock();
             shouldScheduleTimeout = true;
@@ -3695,7 +3687,8 @@ void RIL_onUnsolicitedResponse(int unsolResponse, void *data,
     p.writeInt32 (RESPONSE_UNSOLICITED);
     p.writeInt32 (unsolResponse);
 
-    ret = pRI->responseFunction(p, data, datalen);
+    ret = s_unsolResponses[unsolResponseIndex]
+                .responseFunction(p, data, datalen);
     if (ret != 0) {
         // Problem with the response. Don't continue;
         goto error_exit;
