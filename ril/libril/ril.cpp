@@ -683,7 +683,17 @@ dispatchDial (Parcel &p, RequestInfo *pRI) {
         }
 
         if (uusPresent == 0) {
+#ifdef MODEM_TYPE_XMM6260
+            /* Samsung hack */
+            memset(&uusInfo, 0, sizeof(RIL_UUS_Info));
+            uusInfo.uusType = (RIL_UUS_Type) 0;
+            uusInfo.uusDcs = (RIL_UUS_DCS) 0;
+            uusInfo.uusData = NULL;
+            uusInfo.uusLength = 0;
+            dial.uusInfo = &uusInfo;
+#else
             dial.uusInfo = NULL;
+#endif
         } else {
             int32_t len;
 
@@ -1088,7 +1098,8 @@ dispatchImsGsmSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef
     rism.messageRef = messageRef;
 
     startRequest;
-    appendPrintBuf("%sretry=%d,messageRef=%d,", printBuf, rism.retry, rism.messageRef);
+    appendPrintBuf("%stech=%d, retry=%d, messageRef=%d, ", printBuf,
+                    (int)rism.tech, (int)rism.retry, rism.messageRef);
     if (countStrings == 0) {
         // just some non-null pointer
         pStrings = (char **)alloca(sizeof(char *));
@@ -2343,8 +2354,10 @@ static int responseRilSignalStrength(Parcel &p,
                     void *response, size_t responselen) {
 
     int gsmSignalStrength;
+#if defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
     int cdmaDbm;
     int evdoDbm;
+#endif
 
     if (response == NULL && responselen != 0) {
         RLOGE("invalid response: NULL");
@@ -2357,17 +2370,36 @@ static int responseRilSignalStrength(Parcel &p,
         /* gsmSignalStrength */
         RLOGD("gsmSignalStrength (raw)=%d", p_cur->GW_SignalStrength.signalStrength);
         gsmSignalStrength = p_cur->GW_SignalStrength.signalStrength & 0xFF;
+#ifdef MODEM_TYPE_XMM6260
+        RLOGD("gsmSignalStrength (corrected)=%d", gsmSignalStrength);
+
+        /* 
+         * if gsmSignalStrength isn't a valid value, use cdmaDbm as fallback.
+         * This is needed for old modem firmwares.
+         */
+        if (gsmSignalStrength < 0 || (gsmSignalStrength > 31 && p_cur->GW_SignalStrength.signalStrength != 99)) {
+            RLOGD("gsmSignalStrength-fallback (raw)=%d", p_cur->CDMA_SignalStrength.dbm);
+            gsmSignalStrength = p_cur->CDMA_SignalStrength.dbm;
+            if (gsmSignalStrength < 0) {
+                gsmSignalStrength = 99;
+            } else if (gsmSignalStrength > 31 && gsmSignalStrength != 99) {
+                gsmSignalStrength = 31;
+            }
+            RLOGD("gsmSignalStrength-fallback (corrected)=%d", gsmSignalStrength);
+        }
+#elif defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
         if (gsmSignalStrength < 0) {
             gsmSignalStrength = 99;
         } else if (gsmSignalStrength > 31 && gsmSignalStrength != 99) {
             gsmSignalStrength = 31;
         }
         RLOGD("gsmSignalStrength (corrected)=%d", gsmSignalStrength);
+#endif
         p.writeInt32(gsmSignalStrength);
-
         /* gsmBitErrorRate */
         p.writeInt32(p_cur->GW_SignalStrength.bitErrorRate);
         /* cdmaDbm */
+#if defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
         RLOGD("cdmaDbm (raw)=%d", p_cur->CDMA_SignalStrength.dbm);
         cdmaDbm = p_cur->CDMA_SignalStrength.dbm & 0xFF;
         if (cdmaDbm < 0) {
@@ -2377,9 +2409,12 @@ static int responseRilSignalStrength(Parcel &p,
         }
         //RLOGD("cdmaDbm (corrected)=%d", cdmaDbm);
         p.writeInt32(cdmaDbm);
+#else
+        p.writeInt32(p_cur->CDMA_SignalStrength.dbm);
+#endif
         /* cdmaEcio */
         p.writeInt32(p_cur->CDMA_SignalStrength.ecio);
-        /* evdoDbm */
+#if defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
         RLOGD("evdoDbm (raw)=%d", p_cur->EVDO_SignalStrength.dbm);
         evdoDbm = p_cur->EVDO_SignalStrength.dbm & 0xFF;
         if (evdoDbm < 0) {
@@ -2389,13 +2424,25 @@ static int responseRilSignalStrength(Parcel &p,
         }
         //RLOGD("evdoDbm (corrected)=%d", evdoDbm);
         p.writeInt32(evdoDbm);
-
+#else
+        /* evdoDbm */
+        p.writeInt32(p_cur->EVDO_SignalStrength.dbm);
+#endif
         /* evdoEcio */
         p.writeInt32(p_cur->EVDO_SignalStrength.ecio);
         /* evdoSnr */
         p.writeInt32(p_cur->EVDO_SignalStrength.signalNoiseRatio);
 
         if (responselen >= sizeof (RIL_SignalStrength_v6)) {
+#ifdef MODEM_TYPE_XMM6260
+            /*
+             * ril version <=6 receives negative values for rsrp
+             * workaround for backward compatibility
+             */
+            p_cur->LTE_SignalStrength.rsrp =
+                    ((s_callbacks.version <= 6) && (p_cur->LTE_SignalStrength.rsrp < 0 )) ?
+                        -(p_cur->LTE_SignalStrength.rsrp) : p_cur->LTE_SignalStrength.rsrp;
+#else
             /*
              * Fixup LTE for backwards compatibility
              */
@@ -2422,17 +2469,23 @@ static int responseRilSignalStrength(Parcel &p,
                     p_cur->LTE_SignalStrength.cqi = INT_MAX;
                 }
             }
+#endif
             p.writeInt32(p_cur->LTE_SignalStrength.signalStrength);
             p.writeInt32(p_cur->LTE_SignalStrength.rsrp);
             p.writeInt32(p_cur->LTE_SignalStrength.rsrq);
             p.writeInt32(p_cur->LTE_SignalStrength.rssnr);
             p.writeInt32(p_cur->LTE_SignalStrength.cqi);
+
         } else {
+#elif defined(MODEM_TYPE_XMM6260)
+            memset(&p_cur->LTE_SignalStrength, sizeof (RIL_LTE_SignalStrength), 0);
+#else
             p.writeInt32(99);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
+#endif
         }
 
         startResponse;
@@ -2445,9 +2498,17 @@ static int responseRilSignalStrength(Parcel &p,
                 printBuf,
                 gsmSignalStrength,
                 p_cur->GW_SignalStrength.bitErrorRate,
+#if defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
                 cdmaDbm,
+#else
+                p_cur->CDMA_SignalStrength.dbm,
+#endif
                 p_cur->CDMA_SignalStrength.ecio,
+#if defined(MODEM_TYPE_XMM6262) || defined(MODEM_TYPE_XMM7260)
                 evdoDbm,
+#else
+                p_cur->EVDO_SignalStrength.dbm,
+#endif
                 p_cur->EVDO_SignalStrength.ecio,
                 p_cur->EVDO_SignalStrength.signalNoiseRatio,
                 p_cur->LTE_SignalStrength.signalStrength,
