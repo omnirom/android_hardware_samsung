@@ -637,9 +637,6 @@ dispatchDial (Parcel &p, RequestInfo *pRI) {
     int32_t sizeOfDial;
     int32_t t;
     int32_t uusPresent;
-#ifdef MODEM_TYPE_XMM7260
-    char *csv;
-#endif
     status_t status;
 
     memset (&dial, 0, sizeof(dial));
@@ -653,25 +650,6 @@ dispatchDial (Parcel &p, RequestInfo *pRI) {
         goto invalid;
     }
 
-#ifdef MODEM_TYPE_XMM7260
-    /* CallDetails.call_type */
-    status = p.readInt32(&t);
-    if (status != NO_ERROR) {
-        goto invalid;
-    }
-    /* CallDetails.call_domain */
-    p.readInt32(&t);
-    if (status != NO_ERROR) {
-        goto invalid;
-    }
-    /* CallDetails.getCsvFromExtra */
-    csv = strdupReadString(p);
-    if (csv == NULL) {
-        goto invalid;
-    }
-    free(csv);
-#endif
-
     if (s_callbacks.version < 3) { // Remove when partners upgrade to version 3
         uusPresent = 0;
         sizeOfDial = sizeof(dial) - sizeof(RIL_UUS_Info *);
@@ -683,7 +661,17 @@ dispatchDial (Parcel &p, RequestInfo *pRI) {
         }
 
         if (uusPresent == 0) {
+#ifdef MODEM_TYPE_XMM6260
+            /* Samsung hack */
+            memset(&uusInfo, 0, sizeof(RIL_UUS_Info));
+            uusInfo.uusType = (RIL_UUS_Type) 0;
+            uusInfo.uusDcs = (RIL_UUS_DCS) 0;
+            uusInfo.uusData = NULL;
+            uusInfo.uusLength = 0;
+            dial.uusInfo = &uusInfo;
+#else
             dial.uusInfo = NULL;
+#endif
         } else {
             int32_t len;
 
@@ -1088,7 +1076,8 @@ dispatchImsGsmSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef
     rism.messageRef = messageRef;
 
     startRequest;
-    appendPrintBuf("%sretry=%d,messageRef=%d,", printBuf, rism.retry, rism.messageRef);
+    appendPrintBuf("%stech=%d, retry=%d, messageRef=%d, ", printBuf,
+                    (int)rism.tech, (int)rism.retry, rism.messageRef);
     if (countStrings == 0) {
         // just some non-null pointer
         pStrings = (char **)alloca(sizeof(char *));
@@ -1843,16 +1832,6 @@ static int responseCallList(Parcel &p, void *response, size_t responselen) {
         p.writeInt32(p_cur->isMT);
         p.writeInt32(p_cur->als);
         p.writeInt32(p_cur->isVoice);
-
-#ifdef MODEM_TYPE_XMM7260
-        p.writeInt32(p_cur->isVideo);
-
-        /* Pass CallDetails */
-        p.writeInt32(0);
-        p.writeInt32(0);
-        writeStringToParcel(p, "");
-#endif
-
         p.writeInt32(p_cur->isVoicePrivacy);
         writeStringToParcel(p, p_cur->number);
         p.writeInt32(p_cur->numberPresentation);
@@ -1881,11 +1860,6 @@ static int responseCallList(Parcel &p, void *response, size_t responselen) {
             p_cur->als,
             (p_cur->isVoice)?"voc":"nonvoc",
             (p_cur->isVoicePrivacy)?"evp":"noevp");
-#ifdef MODEM_TYPE_XMM7260
-        appendPrintBuf("%s,%s,",
-            printBuf,
-            (p_cur->isVideo) ? "vid" : "novid");
-#endif
         appendPrintBuf("%s%s,cli=%d,name='%s',%d]",
             printBuf,
             p_cur->number,
@@ -2343,8 +2317,10 @@ static int responseRilSignalStrength(Parcel &p,
                     void *response, size_t responselen) {
 
     int gsmSignalStrength;
+#ifdef MODEM_TYPE_XMM6262
     int cdmaDbm;
     int evdoDbm;
+#endif
 
     if (response == NULL && responselen != 0) {
         RLOGE("invalid response: NULL");
@@ -2357,17 +2333,36 @@ static int responseRilSignalStrength(Parcel &p,
         /* gsmSignalStrength */
         RLOGD("gsmSignalStrength (raw)=%d", p_cur->GW_SignalStrength.signalStrength);
         gsmSignalStrength = p_cur->GW_SignalStrength.signalStrength & 0xFF;
+#ifdef MODEM_TYPE_XMM6260
+        RLOGD("gsmSignalStrength (corrected)=%d", gsmSignalStrength);
+
+        /* 
+         * if gsmSignalStrength isn't a valid value, use cdmaDbm as fallback.
+         * This is needed for old modem firmwares.
+         */
+        if (gsmSignalStrength < 0 || (gsmSignalStrength > 31 && p_cur->GW_SignalStrength.signalStrength != 99)) {
+            RLOGD("gsmSignalStrength-fallback (raw)=%d", p_cur->CDMA_SignalStrength.dbm);
+            gsmSignalStrength = p_cur->CDMA_SignalStrength.dbm;
+            if (gsmSignalStrength < 0) {
+                gsmSignalStrength = 99;
+            } else if (gsmSignalStrength > 31 && gsmSignalStrength != 99) {
+                gsmSignalStrength = 31;
+            }
+            RLOGD("gsmSignalStrength-fallback (corrected)=%d", gsmSignalStrength);
+        }
+#elif defined(MODEM_TYPE_XMM6262)
         if (gsmSignalStrength < 0) {
             gsmSignalStrength = 99;
         } else if (gsmSignalStrength > 31 && gsmSignalStrength != 99) {
             gsmSignalStrength = 31;
         }
         RLOGD("gsmSignalStrength (corrected)=%d", gsmSignalStrength);
+#endif
         p.writeInt32(gsmSignalStrength);
-
         /* gsmBitErrorRate */
         p.writeInt32(p_cur->GW_SignalStrength.bitErrorRate);
         /* cdmaDbm */
+#ifdef MODEM_TYPE_XMM6262
         RLOGD("cdmaDbm (raw)=%d", p_cur->CDMA_SignalStrength.dbm);
         cdmaDbm = p_cur->CDMA_SignalStrength.dbm & 0xFF;
         if (cdmaDbm < 0) {
@@ -2377,9 +2372,12 @@ static int responseRilSignalStrength(Parcel &p,
         }
         //RLOGD("cdmaDbm (corrected)=%d", cdmaDbm);
         p.writeInt32(cdmaDbm);
+#else
+        p.writeInt32(p_cur->CDMA_SignalStrength.dbm);
+#endif
         /* cdmaEcio */
         p.writeInt32(p_cur->CDMA_SignalStrength.ecio);
-        /* evdoDbm */
+#ifdef MODEM_TYPE_XMM6262
         RLOGD("evdoDbm (raw)=%d", p_cur->EVDO_SignalStrength.dbm);
         evdoDbm = p_cur->EVDO_SignalStrength.dbm & 0xFF;
         if (evdoDbm < 0) {
@@ -2389,13 +2387,25 @@ static int responseRilSignalStrength(Parcel &p,
         }
         //RLOGD("evdoDbm (corrected)=%d", evdoDbm);
         p.writeInt32(evdoDbm);
-
+#else
+        /* evdoDbm */
+        p.writeInt32(p_cur->EVDO_SignalStrength.dbm);
+#endif
         /* evdoEcio */
         p.writeInt32(p_cur->EVDO_SignalStrength.ecio);
         /* evdoSnr */
         p.writeInt32(p_cur->EVDO_SignalStrength.signalNoiseRatio);
 
         if (responselen >= sizeof (RIL_SignalStrength_v6)) {
+#ifdef MODEM_TYPE_XMM6260
+            /*
+             * ril version <=6 receives negative values for rsrp
+             * workaround for backward compatibility
+             */
+            p_cur->LTE_SignalStrength.rsrp =
+                    ((s_callbacks.version <= 6) && (p_cur->LTE_SignalStrength.rsrp < 0 )) ?
+                        -(p_cur->LTE_SignalStrength.rsrp) : p_cur->LTE_SignalStrength.rsrp;
+#else
             /*
              * Fixup LTE for backwards compatibility
              */
@@ -2422,17 +2432,23 @@ static int responseRilSignalStrength(Parcel &p,
                     p_cur->LTE_SignalStrength.cqi = INT_MAX;
                 }
             }
+#endif
             p.writeInt32(p_cur->LTE_SignalStrength.signalStrength);
             p.writeInt32(p_cur->LTE_SignalStrength.rsrp);
             p.writeInt32(p_cur->LTE_SignalStrength.rsrq);
             p.writeInt32(p_cur->LTE_SignalStrength.rssnr);
             p.writeInt32(p_cur->LTE_SignalStrength.cqi);
+
         } else {
+#elif defined(MODEM_TYPE_XMM6260)
+            memset(&p_cur->LTE_SignalStrength, sizeof (RIL_LTE_SignalStrength), 0);
+#else
             p.writeInt32(99);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
             p.writeInt32(INT_MAX);
+#endif
         }
 
         startResponse;
@@ -2445,9 +2461,17 @@ static int responseRilSignalStrength(Parcel &p,
                 printBuf,
                 gsmSignalStrength,
                 p_cur->GW_SignalStrength.bitErrorRate,
+#ifdef MODEM_TYPE_XMM6262
                 cdmaDbm,
+#else
+                p_cur->CDMA_SignalStrength.dbm,
+#endif
                 p_cur->CDMA_SignalStrength.ecio,
+#ifdef MODEM_TYPE_XMM6262
                 evdoDbm,
+#else
+                p_cur->EVDO_SignalStrength.dbm,
+#endif
                 p_cur->EVDO_SignalStrength.ecio,
                 p_cur->EVDO_SignalStrength.signalNoiseRatio,
                 p_cur->LTE_SignalStrength.signalStrength,
@@ -4050,6 +4074,16 @@ requestToString(int request) {
         case RIL_UNSOL_CDMA_PRL_CHANGED: return "UNSOL_CDMA_PRL_CHANGED";
         case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE: return "UNSOL_EXIT_EMERGENCY_CALLBACK_MODE";
         case RIL_UNSOL_RIL_CONNECTED: return "UNSOL_RIL_CONNECTED";
+        case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
+        case RIL_UNSOL_CELL_INFO_LIST: return "UNSOL_CELL_INFO_LIST";
+        case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "RESPONSE_IMS_NETWORK_STATE_CHANGED";
+        case RIL_UNSOL_STK_SEND_SMS_RESULT: return "RIL_UNSOL_STK_SEND_SMS_RESULT";
+        default: return "<unknown request>";
+    }
+}
+
+} /* namespace android */
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ED: return "UNSOL_RIL_CONNECTED";
         case RIL_UNSOL_VOICE_RADIO_TECH_CHANGED: return "UNSOL_VOICE_RADIO_TECH_CHANGED";
         case RIL_UNSOL_CELL_INFO_LIST: return "UNSOL_CELL_INFO_LIST";
         case RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED: return "RESPONSE_IMS_NETWORK_STATE_CHANGED";
